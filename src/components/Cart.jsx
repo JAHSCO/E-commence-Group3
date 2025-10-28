@@ -154,10 +154,7 @@ function Cart({ user, onNavigate, onCartUpdate, localCart, setLocalCart }) {
               <span>Subtotal:</span>
               <span>K{calculateTotal()}</span>
             </div>
-            <div className="summary-row">
-              <span>Shipping:</span>
-              <span>Free</span>
-            </div>
+           
             <div className="summary-row total">
               <span>Total:</span>
               <span>K{calculateTotal()}</span>

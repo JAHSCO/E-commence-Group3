@@ -1,175 +1,128 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import './Checkout.css';
 
 function Checkout({ user, onNavigate, localCart, setLocalCart }) {
-  const [cartItems, setCartItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
+  const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
+  const [processing, setProcessing] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      fetchCartItems();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
-
-  const fetchCartItems = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('cart_items')
-        .select(`
-          id,
-          quantity,
-          products (
-            id,
-            name,
-            price,
-            stock
-          )
-        `)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      setCartItems(data || []);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  // simple phone validation: digits only, length 7-15 (adjust as needed)
+  const validatePhone = (p) => {
+    const cleaned = p.replace(/\D/g, '');
+    return cleaned.length >= 7 && cleaned.length <= 15;
   };
 
-  const calculateTotal = () => {
-    return displayItems.reduce((total, item) => {
-      return total + (item.products.price * item.quantity);
-    }, 0).toFixed(2);
-  };
-
-
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError('');
+    if (!validatePhone(phone)) {
+      setError('Please enter a valid phone number (digits only).');
+      return;
+    }
+
     setProcessing(true);
 
-    try {
-      if (!user) {
-        alert('Payment processed successfully! Thank you for your purchase.');
-        setLocalCart([]);
-        onNavigate('home');
-        return;
+    // simulate payment processing delay
+    setTimeout(async () => {
+      try {
+        // If logged-in user, clear their cart in Supabase
+        if (user?.id) {
+          const { error: delError } = await supabase
+            .from('cart_items')
+            .delete()
+            .eq('user_id', user.id);
+          if (delError) {
+            // don't block success for minor DB errors, but log
+            console.error('Error clearing cart_items:', delError);
+          }
+        } else {
+          // guest: clear local cart
+          setLocalCart([]);
+        }
+
+        setSuccess(true);
+        setProcessing(false);
+
+        // Small delay so user sees success UI then navigate home
+        setTimeout(() => {
+          // go home and optionally show an alert
+          onNavigate('home');
+          alert('Payment successful — thank you!');
+        }, 1200);
+      } catch (err) {
+        console.error(err);
+        setProcessing(false);
+        setError('Payment failed (simulated). Please try again.');
       }
-
-      const totalAmount = parseFloat(calculateTotal());
-
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          user_id: user.id,
-          total_amount: totalAmount,
-          status: 'paid'
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      const orderItems = displayItems.map(item => ({
-        order_id: orderData.id,
-        product_id: item.products.id,
-        quantity: item.quantity,
-        price: item.products.price
-      }));
-
-      const { error: orderItemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (orderItemsError) throw orderItemsError;
-
-      const { error: deleteError } = await supabase
-        .from('cart_items')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (deleteError) throw deleteError;
-
-      alert('Order placed successfully! Thank you for your purchase.');
-      onNavigate('home');
-
-    } catch (err) {
-      setError(err.message || 'Failed to process order');
-    } finally {
-      setProcessing(false);
-    }
+    }, 1400); // 1.4s fake processing time
   };
 
-  const displayItems = user ? cartItems : localCart.map(item => ({
-    id: item.id,
-    quantity: item.quantity,
-    products: {
-      id: item.id,
-      name: item.name,
-      price: item.price,
-      stock: item.stock
-    }
-  }));
-
-  if (loading) {
-    return <div className="loading">Loading checkout...</div>;
-  }
-
-  if (displayItems.length === 0) {
-    return (
-      <div className="checkout-empty">
-        <h2>Your cart is empty</h2>
-        <p>Add some products to checkout</p>
-        <button onClick={() => onNavigate('home')}>Continue Shopping</button>
-      </div>
-    );
-  }
-
   return (
-    <div className="checkout-container">
-      <h2>Payment</h2>
+    <div className="checkout-wrapper">
+      <div className="checkout-card">
+        <h2>Payment</h2>
 
-      {error && <div className="error-message">{error}</div>}
+        {!success ? (
+          <>
+            <p className="checkout-instruction">
+              Enter your phone number to simulate payment.
+            </p>
 
-      <div className="checkout-content">
+            <form className="checkout-form" onSubmit={handleSubmit}>
+              <label className="field-label">
+                Phone number
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+260 96 000 0000"
+                  className="phone-input"
+                  required
+                />
+              </label>
 
-        <div className="order-summary">
-          <h3>Order Summary</h3>
+              {error && <div className="checkout-error">{error}</div>}
 
-          <div className="summary-items">
-            {displayItems.map(item => (
-              <div key={item.id} className="summary-item">
-                <span>{item.products.name} x {item.quantity}</span>
-                <span>${(item.products.price * item.quantity).toFixed(2)}</span>
+              <div className="checkout-actions">
+                <button
+                  type="submit"
+                  className="pay-btn"
+                  disabled={processing}
+                >
+                  {processing ? 'Processing…' : 'Pay (Fake)'}
+                </button>
+
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  onClick={() => onNavigate('cart')}
+                  disabled={processing}
+                >
+                  Back to Cart
+                </button>
               </div>
-            ))}
-          </div>
+            </form>
 
-          <div className="summary-totals">
-            <div className="summary-row">
-              <span>Subtotal:</span>
-              <span>${calculateTotal()}</span>
-            </div>
-            <div className="summary-row">
-              <span>Shipping:</span>
-              <span>Free</span>
-            </div>
-            <div className="summary-row total">
-              <span>Total:</span>
-              <span>${calculateTotal()}</span>
-            </div>
+            {processing && (
+              <div className="processing-row">
+                <div className="loader-dot" />
+                <div className="loader-dot" />
+                <div className="loader-dot" />
+                <span className="processing-text">Processing payment…</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="success-box">
+            <h3>Payment Successful 🎉</h3>
+            <p>Your order has been placed (simulated).</p>
+            <button onClick={() => onNavigate('home')} className="done-btn">
+              Continue Shopping
+            </button>
           </div>
-
-          <button onClick={handleSubmit} className="place-order-btn" disabled={processing}>
-            {processing ? 'Processing...' : `Complete Payment - $${calculateTotal()}`}
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

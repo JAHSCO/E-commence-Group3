@@ -1,29 +1,70 @@
-import { useState } from 'react';
-import './AdminDashbord.css'; // ✅ make sure filename matches exactly
+import { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
+import './AdminDashbord.css';
 
 function AdminDashboard() {
   const [products, setProducts] = useState([]);
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(false);
 
-  const addProduct = (e) => {
+  // Fetch registered users
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles') // assuming profiles table exists
+        .select('id, email, role, created_at');
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (err) {
+      console.error('Error fetching users:', err.message);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Add Product
+  const addProduct = async (e) => {
     e.preventDefault();
     if (!name || !quantity) return;
-    setProducts([...products, { name, quantity }]);
-    setName('');
-    setQuantity('');
+
+    setLoadingProducts(true);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .insert([{ name, quantity }]); // adapt fields to your table
+      if (error) throw error;
+
+      setProducts(prev => [...prev, { name, quantity }]);
+      setName('');
+      setQuantity('');
+      alert('Product added!');
+    } catch (err) {
+      alert('Error adding product: ' + err.message);
+    } finally {
+      setLoadingProducts(false);
+    }
   };
 
   return (
     <div className="admin-container">
       <div className="admin-header">
         <h1>Admin Dashboard</h1>
-        <p>Manage your store products here</p>
+        <p>Manage products and view registered users</p>
       </div>
 
+      {/* Add Product Section */}
       <div className="admin-card">
         <h2>Add Product</h2>
-        <form onSubmit={addProduct} className="admin-form">
+        <form className="admin-form" onSubmit={addProduct}>
           <input
             type="text"
             placeholder="Product name"
@@ -38,20 +79,25 @@ function AdminDashboard() {
             onChange={(e) => setQuantity(e.target.value)}
             required
           />
-          <button type="submit">Add Product</button>
+          <button type="submit" disabled={loadingProducts}>
+            {loadingProducts ? 'Adding...' : 'Add Product'}
+          </button>
         </form>
       </div>
 
+      {/* View Users Section */}
       <div className="admin-card">
-        <h2>Available Products</h2>
-        {products.length === 0 ? (
-          <p className="empty">No products added yet.</p>
+        <h2>Registered Users</h2>
+        {loadingUsers ? (
+          <p>Loading users...</p>
+        ) : users.length === 0 ? (
+          <p className="empty">No users registered yet.</p>
         ) : (
           <ul className="product-list">
-            {products.map((prod, index) => (
-              <li key={index}>
-                <span>{prod.name}</span>
-                <span className="quantity">Qty: {prod.quantity}</span>
+            {users.map(user => (
+              <li key={user.id}>
+                <span>{user.email}</span>
+                <span className="quantity">{user.role || 'user'}</span>
               </li>
             ))}
           </ul>

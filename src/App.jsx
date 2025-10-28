@@ -184,12 +184,12 @@ function App() {
           />
         )}
 
-        {/* 🟢 Admin Dashboard */}
+        {/*  Admin Dashboard */}
         {user?.email === 'bed-com-24-23@unima.ac.mw' && currentPage === 'admin-dashboard' && (
           <AdminDashboard />
         )}
 
-        {/* 🟢 Products for normal users */}
+        {/*  Products for normal users */}
         {(currentPage === 'home' || currentPage === 'items') && (
           <ProductList
             category="all"
@@ -198,7 +198,7 @@ function App() {
           />
         )}
 
-        {/* 🟢 Cart */}
+        {/*  Cart */}
         {currentPage === 'cart' && (
           <Cart
             user={user}
@@ -209,7 +209,7 @@ function App() {
           />
         )}
 
-        {/* 🟢 Checkout */}
+        {/* Checkout */}
         {currentPage === 'payment' && (
           <Checkout
             user={user}
